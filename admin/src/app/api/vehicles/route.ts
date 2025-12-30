@@ -1,97 +1,89 @@
-import { NextResponse } from "next/server";
-import { AdminFieldValue, getAdminDb, verifyAdminFromRequest } from "@/lib/firebaseAdmin";
+import { NextRequest, NextResponse } from "next/server";
+import { getAdminDb, verifyAdminFromRequest } from "@/lib/firebaseAdmin";
 
-function clean(s: any) {
-  return typeof s === "string" ? s.trim() : s;
+function norm(s: string) {
+  return String(s || "").trim().toUpperCase();
 }
 
-export async function GET(req: Request) {
-  try {
-    await verifyAdminFromRequest(req);
-    const db = getAdminDb();
-    const url = new URL(req.url);
+export async function GET(req: NextRequest) {
+  const gate = await verifyAdminFromRequest(req);
+  if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
 
-    const plate = clean(url.searchParams.get("plate"));
-    const tapela = clean(url.searchParams.get("tapela"));
+  const db = getAdminDb();
+  const url = new URL(req.url);
 
-    let q: FirebaseFirestore.Query = db.collection("vehicles");
-    if (plate) q = q.where("plate", "==", plate);
-    if (tapela) q = q.where("tapela", "==", tapela);
+  const plateQ = norm(url.searchParams.get("plate") || "");
+  const tapelaQ = norm(url.searchParams.get("tapela") || "");
 
-    const snap = await q.limit(200).get();
-    const rows = snap.docs.map((d) => ({ ...d.data(), plate: d.id }));
+  // Fetch a bounded list then filter in-memory to avoid Firestore composite index pain.
+  // Admin UI volumes are low; this is stable for emulator + early prod.
+  const snap = await db.collection("vehicles").orderBy("updatedAt", "desc").limit(500).get();
 
-    return NextResponse.json({ rows });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "FAILED" }, { status: 401 });
+  let rows = snap.docs.map((d) => {
+    const data = d.data() || {};
+    return {
+      plate: d.id,
+      seatCapacity: data.seatCapacity ?? null,
+      status: data.status ?? "ACTIVE",
+      vin: data.vin ?? "",
+      tapela: data.tapela ?? "",
+      ownerName: data.ownerName ?? "",
+      ownerPhone: data.ownerPhone ?? "",
+      createdAt: data.createdAt ?? null,
+      updatedAt: data.updatedAt ?? null,
+    };
+  });
+
+  if (plateQ) {
+    rows = rows.filter((r) => norm(r.plate).startsWith(plateQ));
   }
+  if (tapelaQ) {
+    // tapela is optional metadata; allow contains-match to be useful
+    rows = rows.filter((r) => norm(r.tapela || "").includes(tapelaQ));
+  }
+
+  return NextResponse.json({ ok: true, rows }, { status: 200 });
 }
 
-/**
- * POST body:
- * { mode?: "create"|"upsert", plate, seatCapacity, status, vin?, tapela?, ownerName?, ownerPhone? }
- */
-export async function POST(req: Request) {
-  try {
-    await verifyAdminFromRequest(req);
-    const db = getAdminDb();
-    const body = await req.json().catch(() => ({}));
+export async function POST(req: NextRequest) {
+  const gate = await verifyAdminFromRequest(req);
+  if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
 
-    const mode = body?.mode === "create" ? "create" : "upsert";
-    const plate = clean(body?.plate);
-    const seatCapacity = Number(body?.seatCapacity);
-    const status = clean(body?.status);
+  const db = getAdminDb();
+  const body = await req.json().catch(() => null);
 
-    if (!plate) return NextResponse.json({ error: "plate required" }, { status: 400 });
-    if (!Number.isFinite(seatCapacity) || seatCapacity <= 0)
-      return NextResponse.json({ error: "seatCapacity must be > 0" }, { status: 400 });
-    if (!["ACTIVE", "SUSPENDED", "REVOKED"].includes(status))
-      return NextResponse.json({ error: "invalid status" }, { status: 400 });
+  const mode = String(body?.mode || "upsert"); // "create" | "upsert"
+  const plate = norm(body?.plate || "");
+  const seatCapacity = Number(body?.seatCapacity);
 
-    const ref = db.collection("vehicles").doc(plate);
-    const existing = await ref.get();
-
-    if (mode === "create" && existing.exists) {
-      return NextResponse.json({ error: "DUPLICATE_PLATE" }, { status: 409 });
-    }
-
-    await ref.set(
-      {
-        plate,
-        seatCapacity,
-        status,
-        vin: clean(body?.vin) || null,
-        tapela: clean(body?.tapela) || null,
-        ownerName: clean(body?.ownerName) || null,
-        ownerPhone: clean(body?.ownerPhone) || null,
-        updatedAt: AdminFieldValue.serverTimestamp(),
-        createdAt: existing.exists ? (existing.data() as any)?.createdAt || AdminFieldValue.serverTimestamp() : AdminFieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "FAILED" }, { status: 401 });
+  if (!plate) return NextResponse.json({ ok: false, error: "PLATE_REQUIRED" }, { status: 400 });
+  if (!Number.isFinite(seatCapacity) || seatCapacity <= 0) {
+    return NextResponse.json({ ok: false, error: "SEAT_CAPACITY_REQUIRED" }, { status: 400 });
   }
-}
 
-/**
- * DELETE /api/vehicles?plate=...
- */
-export async function DELETE(req: Request) {
-  try {
-    await verifyAdminFromRequest(req);
-    const db = getAdminDb();
-    const url = new URL(req.url);
-    const plate = clean(url.searchParams.get("plate"));
-    if (!plate) return NextResponse.json({ error: "plate required" }, { status: 400 });
+  const docRef = db.collection("vehicles").doc(plate);
+  const exists = (await docRef.get()).exists;
 
-    // Delete main doc. (Subcollections remain unless explicitly deleted; acceptable for admin v1)
-    await db.collection("vehicles").doc(plate).delete();
-
-    return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "FAILED" }, { status: 401 });
+  if (mode === "create" && exists) {
+    return NextResponse.json({ ok: false, error: "PLATE_ALREADY_EXISTS" }, { status: 409 });
   }
+
+  const now = new Date();
+
+  await docRef.set(
+    {
+      // keep plate as docId; also store optional fields
+      seatCapacity,
+      status: body?.status || "ACTIVE",
+      vin: String(body?.vin || "").trim(),
+      tapela: String(body?.tapela || "").trim(),
+      ownerName: String(body?.ownerName || "").trim(),
+      ownerPhone: String(body?.ownerPhone || "").trim(),
+      updatedAt: now,
+      ...(exists ? {} : { createdAt: now }),
+    },
+    { merge: true }
+  );
+
+  return NextResponse.json({ ok: true }, { status: 200 });
 }
