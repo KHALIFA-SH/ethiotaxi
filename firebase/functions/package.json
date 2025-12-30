@@ -1,0 +1,20 @@
+{
+  "name": "ethiotaxi-functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "serve": "firebase emulators:start --only functions,firestore,auth",
+    "test": "node ../seed/createTestUsersAndClaims.js --project ethio-taxi && node ../seed/runStage1Tests.js --project ethio-taxi"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.3.1",
+    "firebase-functions": "^4.7.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "projectId": "ethio-taxi",
+  "password": "Passw0rd!",
+  "enforcer": {
+    "email": "enforcer@test.com",
+    "uid": "WaV6lTkEWVJVXmUl7mdUK1Jp99aV"
+  },
+  "helper": {
+    "email": "helper@test.com",
+    "uid": "eA1KfGYEAgeRYRrtkx4ZdlAoLsJA"
+  }
+}

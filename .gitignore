@@ -1,0 +1,118 @@
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+
+# =========================
+# Node / Package Managers
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.npm/
+.yarn/
+
+# lock files (keep ONE of these if your repo policy requires)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# =========================
+# Next.js / React / Web
+# =========================
+.next/
+out/
+dist/
+build/
+.cache/
+.vercel/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Env files (DO NOT commit secrets)
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# =========================
+# Firebase
+# =========================
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+*.firebase.json
+
+# Emulator data / exports
+# (keep exports only if you intentionally version them)
+firebase-export/
+emulator-data/
+emulators/
+firestore_export/
+storage_export/
+
+# =========================
+# Functions build artifacts
+# =========================
+lib/
+functions/lib/
+functions/dist/
+functions/.env
+functions/.env.*
+
+# =========================
+# TypeScript / Tooling
+# =========================
+*.map
+*.d.ts.map
+
+# =========================
+# Logs / Runtime
+# =========================
+logs/
+*.pid
+*.seed
+*.tmp
+
+# =========================
+# Local secrets / credentials
+# =========================
+**/serviceAccountKey.json
+**/service-account*.json
+**/*-sa-key.json
+**/credentials.json
+
+# =========================
+# Firebase rules/indexes backups
+# =========================
+*.rules.bak
+firestore.indexes.json.bak
+firestore.rules.bak
+
+# =========================
+# Testing / Playwright / Cypress
+# =========================
+playwright-report/
+test-results/
+cypress/videos/
+cypress/screenshots/
+
+# =========================
+# Misc
+# =========================
+*.zip
+*.tar
+*.gz
